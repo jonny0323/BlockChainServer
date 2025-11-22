@@ -1,0 +1,39 @@
+{
+  "name": "blockchainserver",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jonny0323/BlockChainServer.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jonny0323/BlockChainServer/issues"
+  },
+  "homepage": "https://github.com/jonny0323/BlockChainServer#readme",
+  "description": "",
+  "dependencies": {
+    "@lit-protocol/constants": "^8.0.8",
+    "@lit-protocol/contracts-sdk": "^7.3.1",
+    "@lit-protocol/lit-auth-client": "^7.3.1",
+    "@lit-protocol/lit-node-client": "^7.3.1",
+    "@lit-protocol/pkp-ethers": "^7.3.1",
+    "axios": "^1.13.2",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "ethers": "^5.8.0",
+    "express": "^5.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "mysql2": "^3.15.3",
+    "siwe": "^2.3.2"
+  },
+  "imports": {
+    "#utility/*": "./src/utility/*",
+    "#abi/*": "./src/shared/abi/*"
+  }
+}
