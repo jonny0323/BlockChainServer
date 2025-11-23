@@ -87,17 +87,25 @@ jobs:
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.ORACLE_USERNAME }}@${{ secrets.ORACLE_HOST }} << 'EOF'
             cat > ~/app/backend/.env << 'ENVEOF'
-          DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
+          PORT=${{ secrets.PORT }}
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_REDIRECT_URL=${{ secrets.GOOGLE_REDIRECT_URL }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_TOKEN_URL=${{ secrets.GOOGLE_TOKEN_URL }}
+          GOOGLE_INFORMATION_URL=${{ secrets.GOOGLE_INFORMATION_URL }}
+          FACTORY_ADDRESS=${{ secrets.FACTORY_ADDRESS }}
+          ADMIN_PRIVATE_KEY=${{ secrets.ADMIN_PRIVATE_KEY }}
+          POLYGON_RPC_URL=${{ secrets.POLYGON_RPC_URL }}
+          POLYGONSCAN_API_KEY=${{ secrets.POLYGONSCAN_API_KEY }}
+          BTCPriceFeedAddress=${{ secrets.BTCPriceFeedAddress }}
+          CHRONICLE_RPC_URL=${{ secrets.CHRONICLE_RPC_URL }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          DB_HOST=db
+          DB_PORT=3306
           DB_NAME=${{ secrets.DB_NAME }}
           DB_USER=${{ secrets.DB_USER }}
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
-          JWT_SECRET=${{ secrets.JWT_SECRET }}
-          POLYGON_RPC_URL=${{ secrets.POLYGON_RPC_URL }}
-          ADMIN_PRIVATE_KEY=${{ secrets.ADMIN_PRIVATE_KEY }}
-          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_CALLBACK_URL=${{ secrets.GOOGLE_CALLBACK_URL }}
-          FACTORY_ADDRESS=${{ secrets.FACTORY_ADDRESS }}
+          DB_ROOT_PASSWORD=${{ secrets.DB_ROOT_PASSWORD }}
           ENVEOF
           EOF
 
