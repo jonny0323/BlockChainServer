@@ -186,112 +186,232 @@ export const CreateBetting = wrap(async (req, res) => {
 //=========================================================================================================================
 
 
-export const FinishBet = wrap(async (req, res) => {
-    console.log("🏁 베팅 정산 시작");
+export const getFinalizableBets = wrap(async (req, res) => {
+    console.log("📋 정산 가능한 베팅 목록 조회");
     
-    const { marketAddress } = req.body; // 또는 req.params.marketId
+    // ✅ 1. 현재 시간 확인
+    const provider = new ethers.providers.JsonRpcProvider(RPC_URL, {
+        name: "matic",
+        chainId: 137
+    });
     
-    console.log("📍 마켓 주소:", marketAddress);
+    const currentBlock = await provider.getBlock("latest");
+    const currentTimestamp = currentBlock.timestamp;
     
-    // 검증 (v5)
-    if (!marketAddress || !ethers.utils.isAddress(marketAddress)) {
-        throw new Error('유효한 마켓 주소가 필요합니다.');
+    console.log("⏰ 현재 블록 타임스탬프:", currentTimestamp);
+    console.log("📅 현재 시간:", new Date(currentTimestamp * 1000).toISOString());
+    
+    // ✅ 2. DB에서 정산 가능한 베팅 조회
+    // settlement_time이 현재보다 과거이고, is_finalized = false인 베팅들
+    const finalizableBets = await bettingRepository.getFinalizableBets(currentTimestamp);
+    
+    console.log(`📊 정산 가능한 베팅: ${finalizableBets.length}개`);
+    
+    // ✅ 3. 각 베팅의 현재가 조회
+    const priceFeedABI = [
+        "function latestRoundData() external view returns (uint80 roundId, int256 answer, uint256 startedAt, uint256 updatedAt, uint80 answeredInRound)"
+    ];
+    
+    const betsWithPrice = await Promise.all(
+        finalizableBets.map(async (bet) => {
+            let currentPrice = "0";
+            
+            try {
+                const priceFeed = new ethers.Contract(
+                    bet.price_feed_address,
+                    priceFeedABI,
+                    provider
+                );
+                
+                const roundData = await priceFeed.latestRoundData();
+                currentPrice = ethers.utils.formatUnits(roundData.answer, 8);
+            } catch (error) {
+                console.error(`⚠️ 가격 조회 실패 (마켓 ${bet.idx}):`, error.message);
+            }
+            
+            const yesAmount = parseFloat(ethers.utils.formatEther(bet.yes_bet_amount.toString()));
+            const noAmount = parseFloat(ethers.utils.formatEther(bet.no_bet_amount.toString()));
+            const totalAmount = yesAmount + noAmount;
+            
+            return {
+                idx: bet.idx,
+                title: bet.title,
+                settlementTime: bet.settlement_time,
+                targetPrice: ethers.utils.formatUnits(bet.target_price.toString(), 8),
+                currentPrice: currentPrice,
+                participantCount: bet.participant_count,
+                totalBetAmount: totalAmount.toFixed(2),
+                yesBetAmount: yesAmount.toFixed(2),
+                noBetAmount: noAmount.toFixed(2),
+                marketAddress: bet.market_contract_address,
+                priceFeedAddress: bet.price_feed_address
+            };
+        })
+    );
+    
+    res.status(200).json({
+        success: true,
+        count: betsWithPrice.length,
+        bets: betsWithPrice
+    });
+});
+
+// ============================================
+// ✅ 여러 베팅 한번에 확정
+// ============================================
+export const finalizeBatchBets = wrap(async (req, res) => {
+    console.log("🔥 배치 베팅 확정 시작");
+    
+    const { marketIds } = req.body;
+    
+    if (!marketIds || !Array.isArray(marketIds) || marketIds.length === 0) {
+        throw new Error('확정할 베팅 ID 배열이 필요합니다.');
     }
     
-    // Provider & Signer (관리자 키 사용) (v5)
+    console.log(`📋 확정할 베팅: ${marketIds.length}개`);
+    console.log("   IDs:", marketIds);
+    
+    // Provider & Signer 설정
     const provider = new ethers.providers.JsonRpcProvider(RPC_URL, {
         name: "matic",
         chainId: 137
     });
     const signer = new ethers.Wallet(ADMIN_PRIVATE_KEY, provider);
     
-    console.log("👤 정산 실행 지갑:", signer.address);
+    console.log("👤 관리자 지갑:", signer.address);
     
-    // Contract 인스턴스
-    const marketContract = new ethers.Contract(
-        marketAddress,
-        BetMarketArtifact.abi,
-        signer
-    );
+    // ✅ 각 베팅을 순차적으로 처리
+    const results = [];
+    let nonce = await provider.getTransactionCount(signer.address, "pending");
     
-    // ✅ 정산 시간 확인
-    const settlementTime = await marketContract.settlementTime();
-    const currentBlock = await provider.getBlock("latest");
-    const currentTimestamp = currentBlock.timestamp;
-    
-    console.log("⏰ 현재 시간:", new Date(currentTimestamp * 1000).toISOString());
-    console.log("📅 정산 시간:", new Date(Number(settlementTime) * 1000).toISOString());
-    
-    if (currentTimestamp < settlementTime) {
-        throw new Error(`아직 정산 시간이 아닙니다. (${Math.floor((Number(settlementTime) - currentTimestamp) / 60)}분 남음)`);
+    for (const marketId of marketIds) {
+        try {
+            console.log(`\n🎯 마켓 #${marketId} 확정 중...`);
+            
+            // 1. 마켓 정보 조회
+            const market = await bettingRepository.getMarketDetail(marketId);
+            
+            if (!market) {
+                console.error(`❌ 마켓 #${marketId}: 존재하지 않음`);
+                results.push({
+                    marketId,
+                    success: false,
+                    error: '존재하지 않는 마켓'
+                });
+                continue;
+            }
+            
+            if (market.is_finalized) {
+                console.warn(`⚠️ 마켓 #${marketId}: 이미 정산됨`);
+                results.push({
+                    marketId,
+                    success: false,
+                    error: '이미 정산된 마켓'
+                });
+                continue;
+            }
+            
+            // 2. Contract 인스턴스 생성
+            const marketContract = new ethers.Contract(
+                market.market_contract_address,
+                BetMarketArtifact.abi,
+                signer
+            );
+            
+            // 3. 가스 설정
+            const priorityFee = ethers.utils.parseUnits("500", "gwei");
+            const maxFee = ethers.utils.parseUnits("1000", "gwei");
+            
+            // 4. Finalize 호출
+            const tx = await marketContract.finalize({
+                gasLimit: 600000,
+                maxPriorityFeePerGas: priorityFee,
+                maxFeePerGas: maxFee,
+                nonce: nonce++, // nonce 증가
+                type: 2
+            });
+            
+            console.log(`   TX 전송: ${tx.hash}`);
+            
+            // 5. 영수증 대기
+            const receipt = await tx.wait();
+            
+            if (receipt.status === 0) {
+                throw new Error(`트랜잭션 실패: ${tx.hash}`);
+            }
+            
+            console.log(`   ✅ 확정 완료 (블록: ${receipt.blockNumber})`);
+            
+            // 6. 최종 가격 확인
+            const finalPrice = await marketContract.getLatestPrice();
+            const targetPrice = await marketContract.targetPrice();
+            const winner = finalPrice.gte(targetPrice) ? "Above" : "Below";
+            
+            console.log(`   💰 최종가: ${ethers.utils.formatUnits(finalPrice, 8)}`);
+            console.log(`   🎯 목표가: ${ethers.utils.formatUnits(targetPrice, 8)}`);
+            console.log(`   🏆 승자: ${winner}`);
+            
+            // 7. DB 업데이트
+            await bettingRepository.updateMarketFinalized(
+                marketId,
+                winner.toLowerCase(),
+                ethers.utils.formatUnits(finalPrice, 8)
+            );
+            
+            results.push({
+                marketId,
+                success: true,
+                transactionHash: tx.hash,
+                blockNumber: receipt.blockNumber,
+                finalPrice: ethers.utils.formatUnits(finalPrice, 8),
+                targetPrice: ethers.utils.formatUnits(targetPrice, 8),
+                winner
+            });
+            
+        } catch (error) {
+            console.error(`❌ 마켓 #${marketId} 확정 실패:`, error.message);
+            results.push({
+                marketId,
+                success: false,
+                error: error.message
+            });
+        }
     }
     
-    // ✅ 이미 정산되었는지 확인
-    const isFinalized = await marketContract.isFinalized();
-    if (isFinalized) {
-        throw new Error('이미 정산된 마켓입니다.');
-    }
+    // ✅ 결과 요약
+    const successCount = results.filter(r => r.success).length;
+    const failCount = results.length - successCount;
     
-    // ✅ Nonce & 가스 설정
-    const nonce = await provider.getTransactionCount(signer.address, "pending");
-    console.log("🔢 Nonce:", nonce);
-    
-    // 현재 가스 가격 확인
-    const feeData = await provider.getFeeData();
-    
-    // 초고속 가스비 설정 (20초 내 확정)
-    const priorityFee = ethers.utils.parseUnits("600", "gwei");
-    const maxFee = ethers.utils.parseUnits("1200", "gwei");
-    
-    console.log("⚡ 초고속 가스 설정:");
-    console.log("   Priority:", ethers.utils.formatUnits(priorityFee, "gwei"), "gwei");
-    console.log("   Max:", ethers.utils.formatUnits(maxFee, "gwei"), "gwei");
-    
-    console.log("📤 Finalize 트랜잭션 전송 중...");
-    
-    // finalize 호출 (v5)
-    const tx = await marketContract.finalize({
-        gasLimit: 600000, // 여유있게
-        maxPriorityFeePerGas: priorityFee,
-        maxFeePerGas: maxFee,
-        nonce: nonce,
-        type: 2 // EIP-1559
-    });
-    
-    console.log("✅ TX 전송:", tx.hash);
-    console.log("🔗 PolygonScan:", `https://polygonscan.com/tx/${tx.hash}`);
-    
-    console.log("⏳ 트랜잭션 완료 대기 중...");
-    
-    const receipt = await tx.wait();
-    
-    if (receipt.status === 0) {
-        throw new Error(`정산 실패: ${tx.hash}`);
-    }
-    
-    console.log("🎉 정산 완료!");
-    console.log("   블록:", receipt.blockNumber);
-    console.log("   가스:", receipt.gasUsed.toString());
-    
-    // ✅ 최종 가격 확인 (v5)
-    const finalPrice = await marketContract.getLatestPrice();
-    const targetPrice = await marketContract.targetPrice();
-    
-    console.log("💰 최종 가격:", ethers.utils.formatUnits(finalPrice, 8), "USD");
-    console.log("🎯 목표 가격:", ethers.utils.formatUnits(targetPrice, 8), "USD");
-    console.log("📊 결과:", finalPrice.gte(targetPrice) ? "Above 승리! ⬆️" : "Below 승리! ⬇️");
+    console.log("\n📊 배치 확정 완료");
+    console.log(`   성공: ${successCount}개`);
+    console.log(`   실패: ${failCount}개`);
     
     res.status(200).json({
         success: true,
-        message: '정산 완료!',
-        transactionHash: receipt.hash,
-        blockNumber: receipt.blockNumber,
-        finalPrice: ethers.utils.formatUnits(finalPrice, 8),
-        targetPrice: ethers.utils.formatUnits(targetPrice, 8),
-        winner: finalPrice.gte(targetPrice) ? "Above" : "Below",
-        polygonscan: `https://polygonscan.com/tx/${tx.hash}`
+        total: results.length,
+        successCount,
+        failCount,
+        results
     });
 });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 export const placeBettingWithPKP = wrap(async (req, res) => {
     console.log("🎲 PKP 베팅 요청 시작");
@@ -495,7 +615,7 @@ export const GetDetailData = wrap(async (req, res) => {
     
     if (authHeader) {
         try {
-            const userId = extractIdFromToken(authHeader);
+            const userId = extractIdxFromToken(authHeader);
             const bets = await bettingRepository.getUserBetHistory(marketId, userId);
             
             userBets = bets.map(bet => {
@@ -564,4 +684,111 @@ export const GetDetailData = wrap(async (req, res) => {
     });
     
     console.log("✅ 상세 조회 완료");
+});
+
+export const FinishBet = wrap(async (req, res) => {
+    console.log("🏁 베팅 정산 시작");
+    
+    const { marketAddress } = req.body; // 또는 req.params.marketId
+    
+    console.log("📍 마켓 주소:", marketAddress);
+    
+    // 검증 (v5)
+    if (!marketAddress || !ethers.utils.isAddress(marketAddress)) {
+        throw new Error('유효한 마켓 주소가 필요합니다.');
+    }
+    
+    // Provider & Signer (관리자 키 사용) (v5)
+    const provider = new ethers.providers.JsonRpcProvider(RPC_URL, {
+        name: "matic",
+        chainId: 137
+    });
+    const signer = new ethers.Wallet(ADMIN_PRIVATE_KEY, provider);
+    
+    console.log("👤 정산 실행 지갑:", signer.address);
+    
+    // Contract 인스턴스
+    const marketContract = new ethers.Contract(
+        marketAddress,
+        BetMarketArtifact.abi,
+        signer
+    );
+    
+    // ✅ 정산 시간 확인
+    const settlementTime = await marketContract.settlementTime();
+    const currentBlock = await provider.getBlock("latest");
+    const currentTimestamp = currentBlock.timestamp;
+    
+    console.log("⏰ 현재 시간:", new Date(currentTimestamp * 1000).toISOString());
+    console.log("📅 정산 시간:", new Date(Number(settlementTime) * 1000).toISOString());
+    
+    if (currentTimestamp < settlementTime) {
+        throw new Error(`아직 정산 시간이 아닙니다. (${Math.floor((Number(settlementTime) - currentTimestamp) / 60)}분 남음)`);
+    }
+    
+    // ✅ 이미 정산되었는지 확인
+    const isFinalized = await marketContract.isFinalized();
+    if (isFinalized) {
+        throw new Error('이미 정산된 마켓입니다.');
+    }
+    
+    // ✅ Nonce & 가스 설정
+    const nonce = await provider.getTransactionCount(signer.address, "pending");
+    console.log("🔢 Nonce:", nonce);
+    
+    // 현재 가스 가격 확인
+    const feeData = await provider.getFeeData();
+    
+    // 초고속 가스비 설정 (20초 내 확정)
+    const priorityFee = ethers.utils.parseUnits("600", "gwei");
+    const maxFee = ethers.utils.parseUnits("1200", "gwei");
+    
+    console.log("⚡ 초고속 가스 설정:");
+    console.log("   Priority:", ethers.utils.formatUnits(priorityFee, "gwei"), "gwei");
+    console.log("   Max:", ethers.utils.formatUnits(maxFee, "gwei"), "gwei");
+    
+    console.log("📤 Finalize 트랜잭션 전송 중...");
+    
+    // finalize 호출 (v5)
+    const tx = await marketContract.finalize({
+        gasLimit: 600000, // 여유있게
+        maxPriorityFeePerGas: priorityFee,
+        maxFeePerGas: maxFee,
+        nonce: nonce,
+        type: 2 // EIP-1559
+    });
+    
+    console.log("✅ TX 전송:", tx.hash);
+    console.log("🔗 PolygonScan:", `https://polygonscan.com/tx/${tx.hash}`);
+    
+    console.log("⏳ 트랜잭션 완료 대기 중...");
+    
+    const receipt = await tx.wait();
+    
+    if (receipt.status === 0) {
+        throw new Error(`정산 실패: ${tx.hash}`);
+    }
+    
+    console.log("🎉 정산 완료!");
+    console.log("   블록:", receipt.blockNumber);
+    console.log("   가스:", receipt.gasUsed.toString());
+    
+    // ✅ 최종 가격 확인 (v5)
+    const finalPrice = await marketContract.getLatestPrice();
+    const targetPrice = await marketContract.targetPrice();
+    
+    console.log("💰 최종 가격:", ethers.utils.formatUnits(finalPrice, 8), "USD");
+    console.log("🎯 목표 가격:", ethers.utils.formatUnits(targetPrice, 8), "USD");
+    console.log("📊 결과:", finalPrice.gte(targetPrice) ? "Above 승리! ⬆️" : "Below 승리! ⬇️");
+    
+    res.status(200).json({
+        success: true,
+        message: '정산 완료!',
+        transactionHash: receipt.hash,
+        blockNumber: receipt.blockNumber,
+        finalPrice: ethers.utils.formatUnits(finalPrice, 8),
+        targetPrice: ethers.utils.formatUnits(targetPrice, 8),
+        winner: finalPrice.gte(targetPrice) ? "Above" : "Below",
+        polygonscan: `https://polygonscan.com/tx/${tx.hash}`
+    });
 });

@@ -2,28 +2,48 @@ import express from 'express';
 
 import {
   CreateBetting,
-  FinishBet,
+  getFinalizableBets,
   placeBettingWithPKP,
   GetMainData,
-  GetDetailData
+  GetDetailData,
+  finalizeBatchBets,
+  FinishBet
 } from './service.js';
-import { verifyToken } from '../../middleware/AuthMiddleware.js';
-
+import { verifyToken, verifyAdmin } from '../../middleware/AuthMiddleware.js';
 
 const router = express.Router();
 
-// // 4. ✨ POST: 새로운 마켓 생성 (Admin 기능: CreateBet)
-router.post('/create', CreateBetting);
+// ============================================
+// 📋 공개 API (인증 불필요)
+// ============================================
 
-router.post('/:marketId', placeBettingWithPKP);
-
-// // 5. ✨ PUT: 마켓 정산 완료 (Admin 기능: CompleteBet)
-router.put('/:marketId/finalize',FinishBet);
-
+// 메인 페이지 - 진행 중인 베팅 목록
 router.get('/GetMainData', GetMainData); 
 
+// 상세 페이지 - 특정 베팅 정보 (로그인 시 사용자 베팅 내역 포함)
 router.get('/GetDetailData/:marketId', GetDetailData); 
 
-// // 관리자 권한 미들웨어 추가
+// ============================================
+// 🔐 사용자 API (로그인 필요)
+// ============================================
+
+// 베팅 참여
+router.post('/:marketId', verifyToken, placeBettingWithPKP);
+
+// ============================================
+// 👑 관리자 전용 API (Admin 권한 필요)
+// ============================================
+
+// 새로운 베팅 생성
+router.post('/create', verifyToken, verifyAdmin, CreateBetting);
+
+// 정산 가능한 베팅 목록 조회
+router.get('/finalizeable', verifyToken, verifyAdmin, getFinalizableBets);
+
+// 여러 베팅 한번에 확정
+router.post('/finalize', verifyToken, verifyAdmin, finalizeBatchBets);
+
+// 단일 베팅 확정
+router.put('/:marketId/finalize', verifyToken, verifyAdmin, FinishBet);
 
 export default router;
