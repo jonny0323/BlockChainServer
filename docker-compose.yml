@@ -26,9 +26,7 @@ services:
 
   # 백엔드 API
   backend:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: betting-backend:latest
     container_name: betting-backend
     restart: always
     ports:
@@ -48,6 +46,8 @@ services:
       - FACTORY_ADDRESS=${FACTORY_ADDRESS}
       - PORT=3000
       - NODE_ENV=production
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
