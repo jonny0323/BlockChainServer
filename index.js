@@ -27,3 +27,7 @@ app.use((err, req, res, next) => {
 app.listen(process.env.PORT, () => {
   console.log(`${process.env.PORT}포트에서 웹서버 실행중`);
 });
+
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'OK' });
+});
