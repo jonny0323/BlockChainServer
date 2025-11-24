@@ -125,8 +125,20 @@ jobs:
             echo "Checking container status..."
             docker-compose ps
             echo "Waiting for services to be healthy..."
-            sleep 10
-            if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+            for i in {1..30}; do
+              if curl -f http://localhost:3000/health > /dev/null 2>&1; then
+                echo "✅ Backend is healthy"
+                break
+              fi
+              echo "Waiting for backend to start... ($i/30)"
+              sleep 2
+            done
+            
+            if ! curl -f http://localhost:3000/health > /dev/null 2>&1; then
+              echo "❌ Backend health check failed after 60 seconds"
+              docker-compose logs backend
+              exit 1
+            fi
               echo "✅ Backend is healthy"
             else
               echo "❌ Backend health check failed"
