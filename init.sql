@@ -1,6 +1,6 @@
 cat > init.sql << 'EOF'
-CREATE DATABASE IF NOT EXISTS betting_db CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE betting_db;
+CREATE DATABASE IF NOT EXISTS BlockChain CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE BlockChain;
 
 -- Users 테이블
 CREATE TABLE IF NOT EXISTS users (
