@@ -6,7 +6,10 @@ const app = express();
 
 import cors from 'cors';
 app.use(cors({
-    origin: 'https://block-chain-front.vercel.app',
+    origin: [
+        'https://block-chain-front.vercel.app',
+        'https://blockchainbetting.duckdns.org'
+    ],
     credentials: true
 }));
 
