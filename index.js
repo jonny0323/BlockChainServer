@@ -18,6 +18,17 @@ app.use('/user', userRoute);
 
 import bettingRoute from './src/modules/betting/route.js';
 app.use('/betting', bettingRoute);
+
+
+
+//git Action====================================================================================
+app.get('/health', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    timestamp: new Date().toISOString(),
+    message: '3000포트에서 웹서버 실행중'
+  });
+});
 //에러 핸들러====================================================================================
 app.use((err, req, res, next) => {
   console.log('에러', err);
@@ -28,10 +39,3 @@ app.listen(process.env.PORT, () => {
   console.log(`${process.env.PORT}포트에서 웹서버 실행중`);
 });
 
-app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    message: '3000포트에서 웹서버 실행중'
-  });
-});
