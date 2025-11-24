@@ -5,7 +5,7 @@ import db from '../../config/db.js';
  */
 export async function findUserByGoogleId(googleId) {
     const [users] = await db.query(
-        'SELECT idx, google_id, pkp_public_key, pkp_token_id, pkp_eth_address FROM users WHERE google_id = ?',
+        'SELECT idx, google_id, pkp_public_key, pkp_token_id, pkp_eth_address,is_admin FROM users WHERE google_id = ?',
         [googleId]
     );
     
