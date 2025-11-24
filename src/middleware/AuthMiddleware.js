@@ -25,7 +25,7 @@ export function verifyToken(req, res, next) {
         req.user = {
             id: decoded.id,              // google_id
             idx: decoded.idx,            // user idx
-            isAdmin: decoded.isAdmin || false
+            isAdmin: decoded.admin || false
         };
         
         next();
@@ -79,7 +79,7 @@ export const extractAdminFromToken = (authHeader) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     
-    return decoded.isAdmin || false;
+    return decoded.admin || false;
 };
 
 /**
@@ -96,7 +96,7 @@ export const verifyAdmin = (req, res, next) => {
             });
         }
         
-        if (!req.user.isAdmin) {
+        if (!req.user.admin) {
             return res.status(403).json({
                 success: false,
                 message: '관리자 권한이 필요합니다.'
