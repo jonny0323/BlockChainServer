@@ -7,7 +7,7 @@ const app = express();
 import cors from 'cors';
 app.use(cors({
     origin: [
-        'https://block-chain-front.vercel.app',  
+        'https://block-chain-front.vercel.app',
     ],
     credentials: true  // 쿠키/인증 허용
 }));
