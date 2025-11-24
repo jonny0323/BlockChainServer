@@ -104,9 +104,8 @@ export const CreateToken = wrap(async (req, res) => {
     });
 //여기다가 신규 유저 db넣어야함 idx 추출
 
-    const UserIdx = await userRepository.findUserByGoogleId({
-        googleId: googleId,
-    });
+    const UserIdx = await userRepository.findUserByGoogleId(googleId);
+
 
     
     // 5. JWT 생성 (신규 유저는 기본적으로 admin=false)
