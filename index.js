@@ -7,10 +7,7 @@ const app = express();
 import cors from 'cors';
 app.use(cors({
     origin: [
-        'http://localhost:5173',  // 로컬 개발
-        'https://blockchainbetting.duckdns.org',  // 프로덕션 백엔드
-        'http://blockchainbetting.duckdns.org',   // HTTP도 허용
-        // 프론트엔드 배포 주소 추가 (Vercel 등)
+        'https://block-chain-front.vercel.app',  
     ],
     credentials: true  // 쿠키/인증 허용
 }));
