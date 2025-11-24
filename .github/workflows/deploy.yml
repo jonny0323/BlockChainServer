@@ -146,7 +146,7 @@ jobs:
           echo "Cleaning up old images..."
           docker image prune -af --filter "until=24h"
           echo "🚀 Deployment completed successfully!"
-        EOF
+        
 
       - name: Verify deployment
         run: |
