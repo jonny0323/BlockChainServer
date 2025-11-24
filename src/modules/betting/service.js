@@ -159,7 +159,7 @@ export const CreateBetting = wrap(async (req, res) => {
     
     const dbResult = await bettingRepository.saveNewMarket({
         title,
-        settlementTime: settlementTime.toString(),
+        settlementTime: new Date(settlementTime * 1000).toISOString().slice(0, 19).replace('T', ' '),
         targetPrice: targetPrice.toString(),
         assetType,
         marketContractAddress: newMarketAddress,
