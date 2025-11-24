@@ -121,7 +121,7 @@ export const CreateToken = wrap(async (req, res) => {
         isAdmin: false
     });
     
-    res.redirect(`block-chain-front.vercel.app/callback?token=${accessToken}`);
+    res.redirect(`http://block-chain-front.vercel.app/callback?token=${accessToken}`);
 });
 
 //=====================================================================================================
