@@ -112,43 +112,41 @@ jobs:
       - name: Deploy to Oracle Cloud
         run: |
           ssh -i ~/.ssh/id_rsa ${{ secrets.ORACLE_USERNAME }}@${{ secrets.ORACLE_HOST }} << 'EOF'
-            set -e
-            cd ~/app
-            echo "Loading Docker image..."
-            docker load < backend-image.tar.gz
-            rm backend-image.tar.gz
-            cd ~/app/backend
-            echo "Stopping existing containers..."
-            docker-compose down || true
-            echo "Starting new containers..."
-            docker-compose up -d
-            echo "Checking container status..."
-            docker-compose ps
-            echo "Waiting for services to be healthy..."
-            for i in {1..30}; do
-              if curl -f http://localhost:3000/health > /dev/null 2>&1; then
-                echo "✅ Backend is healthy"
-                break
-              fi
-              echo "Waiting for backend to start... ($i/30)"
-              sleep 2
-            done
-            
-            if ! curl -f http://localhost:3000/health > /dev/null 2>&1; then
-              echo "❌ Backend health check failed after 60 seconds"
-              docker-compose logs backend
-              exit 1
-            fi
+          set -e
+          cd ~/app
+          echo "Loading Docker image..."
+          docker load < backend-image.tar.gz
+          rm backend-image.tar.gz
+          cd ~/app/backend
+          echo "Stopping existing containers..."
+          docker-compose down || true
+          echo "Starting new containers..."
+          docker-compose up -d
+          echo "Checking container status..."
+          docker-compose ps
+          echo "Waiting for services to be healthy..."
+          
+          HEALTHY=false
+          for i in {1..30}; do
+            if curl -f http://localhost:3000/health > /dev/null 2>&1; then
               echo "✅ Backend is healthy"
-            else
-              echo "❌ Backend health check failed"
-              docker-compose logs backend
-              exit 1
+              HEALTHY=true
+              break
             fi
-            echo "Cleaning up old images..."
-            docker image prune -af --filter "until=24h"
-            echo "🚀 Deployment completed successfully!"
-          EOF
+            echo "Waiting for backend to start... ($i/30)"
+            sleep 2
+          done
+          
+          if [ "$HEALTHY" = false ]; then
+            echo "❌ Backend health check failed after 60 seconds"
+            docker-compose logs backend
+            exit 1
+          fi
+          
+          echo "Cleaning up old images..."
+          docker image prune -af --filter "until=24h"
+          echo "🚀 Deployment completed successfully!"
+        EOF
 
       - name: Verify deployment
         run: |
