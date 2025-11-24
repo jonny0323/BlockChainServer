@@ -395,24 +395,6 @@ export const finalizeBatchBets = wrap(async (req, res) => {
     });
 });
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 export const placeBettingWithPKP = wrap(async (req, res) => {
     console.log("🎲 PKP 베팅 요청 시작");
     

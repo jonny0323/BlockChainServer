@@ -24,14 +24,7 @@ router.get('/GetMainData', GetMainData);
 router.get('/GetDetailData/:marketId', GetDetailData); 
 
 // ============================================
-// 🔐 사용자 API (로그인 필요)
-// ============================================
-
-// 베팅 참여
-router.post('/:marketId', verifyToken, placeBettingWithPKP);
-
-// ============================================
-// 👑 관리자 전용 API (Admin 권한 필요)
+// 👑 관리자 전용 API (Admin 권한 필요) - 구체적 경로 먼저!
 // ============================================
 
 // 새로운 베팅 생성
@@ -42,6 +35,13 @@ router.get('/finalizeable', verifyToken, verifyAdmin, getFinalizableBets);
 
 // 여러 베팅 한번에 확정
 router.post('/finalize', verifyToken, verifyAdmin, finalizeBatchBets);
+
+// ============================================
+// 🔐 사용자 API (로그인 필요) - 동적 경로는 마지막!
+// ============================================
+
+// 베팅 참여
+router.post('/:marketId', verifyToken, placeBettingWithPKP);
 
 // 단일 베팅 확정
 router.put('/:marketId/finalize', verifyToken, verifyAdmin, FinishBet);
