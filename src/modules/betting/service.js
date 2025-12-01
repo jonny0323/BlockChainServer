@@ -394,7 +394,6 @@ export const finalizeBatchBets = wrap(async (req, res) => {
         results
     });
 });
-
 export const placeBettingWithPKP = wrap(async (req, res) => {
     console.log("🎲 PKP 베팅 요청 시작");
     
@@ -409,50 +408,62 @@ export const placeBettingWithPKP = wrap(async (req, res) => {
     console.log("💰 베팅 금액:", amount, "MATIC");
     console.log("📊 베팅 방향:", isAbove ? "Above ⬆️" : "Below ⬇️");
     
-    // ✅ 검증
-    if (!userId || !amount || typeof isAbove !== 'boolean') {
-        throw new Error('필수 파라미터가 누락되었습니다.');
-    }
-    
-    if (parseFloat(amount) <= 0) {
-        throw new Error('베팅 금액은 0보다 커야 합니다.');
-    }
-    
-    // ✅ 마켓 정보 조회
-    const market = await bettingRepository.getMarketDetail(marketId);
-    
-    if (!market) {
-        throw new Error('존재하지 않는 마켓입니다.');
-    }
-    
-    if (market.is_finalized) {
-        throw new Error('이미 종료된 베팅입니다.');
-    }
-    
-    // ✅ 중복 베팅 확인 (선택사항)
-    // const hasAlreadyBet = await bettingRepository.checkUserBet(marketId, userId);
-    // if (hasAlreadyBet) {
-    //     throw new Error('이미 베팅에 참여하셨습니다.');
-    // }
-    
-    const betAmountWei = ethers.utils.parseEther(String(amount));
-    
-    const provider = new ethers.providers.JsonRpcProvider(RPC_URL, {
-        name: "matic",
-        chainId: 137
-    });
-    
-    const marketContract = new ethers.Contract(
-        market.market_contract_address,
-        BetMarketArtifact.abi,
-        provider
-    );
-    
-    const data = marketContract.interface.encodeFunctionData("placeBet", [isAbove]);
-    
-    console.log("🔐 PKP 서명 & 전송 중...");
-    
     try {
+        // ✅ 1. 기본 검증
+        if (!userId || !amount || typeof isAbove !== 'boolean') {
+            return res.status(400).json({
+                success: false,
+                errorType: 'INVALID_PARAMS',
+                message: '필수 파라미터가 누락되었습니다.'
+            });
+        }
+        
+        if (parseFloat(amount) <= 0) {
+            return res.status(400).json({
+                success: false,
+                errorType: 'INVALID_AMOUNT',
+                message: '베팅 금액은 0보다 커야 합니다.'
+            });
+        }
+        
+        // ✅ 2. 마켓 정보 조회
+        const market = await bettingRepository.getMarketDetail(marketId);
+        
+        if (!market) {
+            return res.status(404).json({
+                success: false,
+                errorType: 'MARKET_NOT_FOUND',
+                message: '존재하지 않는 마켓입니다.'
+            });
+        }
+        
+        if (market.is_finalized) {
+            return res.status(400).json({
+                success: false,
+                errorType: 'MARKET_CLOSED',
+                message: '이미 종료된 베팅입니다.'
+            });
+        }
+        
+        // ✅ 3. 트랜잭션 준비
+        const betAmountWei = ethers.utils.parseEther(String(amount));
+        
+        const provider = new ethers.providers.JsonRpcProvider(RPC_URL, {
+            name: "matic",
+            chainId: 137
+        });
+        
+        const marketContract = new ethers.Contract(
+            market.market_contract_address,
+            BetMarketArtifact.abi,
+            provider
+        );
+        
+        const data = marketContract.interface.encodeFunctionData("placeBet", [isAbove]);
+        
+        console.log("🔐 PKP 서명 & 전송 중...");
+        
+        // ✅ 4. PKP로 트랜잭션 전송
         const result = await signAndSendTransactionWithIdx(
             userId,
             market.market_contract_address,
@@ -462,16 +473,16 @@ export const placeBettingWithPKP = wrap(async (req, res) => {
         
         console.log("✅ 트랜잭션 성공:", result.transactionHash);
         
-        // ✅ DB 업데이트
+        // ✅ 5. DB 업데이트
         console.log("💾 DB 업데이트 중...");
         
-        // 1. 참가자 수 업데이트
+        // 참가자 수 업데이트
         await bettingRepository.updateParticipantCount(marketId, isAbove);
         
-        // 2. 베팅 금액 업데이트
+        // 베팅 금액 업데이트
         await bettingRepository.updateBetAmount(marketId, isAbove, betAmountWei.toString());
         
-        // 3. 베팅 기록 저장
+        // 베팅 기록 저장
         await bettingRepository.saveBet({
             userIdx: userIdx,
             betDirection: isAbove,
@@ -493,7 +504,51 @@ export const placeBettingWithPKP = wrap(async (req, res) => {
         
     } catch (error) {
         console.error("❌ 베팅 실패:", error);
-        throw new Error(`베팅 실패: ${error.message}`);
+        
+        // ✅ 가스비 관련 에러 체크
+        const errorMessage = error.message?.toLowerCase() || '';
+        
+        if (errorMessage.includes('insufficient funds') || 
+            errorMessage.includes('gas') ||
+            errorMessage.includes('underpriced') ||
+            errorMessage.includes('fee')) {
+            
+            return res.status(400).json({
+                success: false,
+                errorType: 'INSUFFICIENT_GAS',
+                message: '가스비가 부족합니다. 지갑에 POL을 충전해주세요.'
+            });
+        }
+        
+        // ✅ 네트워크 에러
+        if (errorMessage.includes('network') || 
+            errorMessage.includes('timeout') ||
+            errorMessage.includes('connection')) {
+            
+            return res.status(503).json({
+                success: false,
+                errorType: 'NETWORK_ERROR',
+                message: '네트워크 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+            });
+        }
+        
+        // ✅ 컨트랙트 에러
+        if (errorMessage.includes('revert') || 
+            errorMessage.includes('execution reverted')) {
+            
+            return res.status(400).json({
+                success: false,
+                errorType: 'CONTRACT_ERROR',
+                message: '스마트 컨트랙트 실행 중 오류가 발생했습니다.'
+            });
+        }
+        
+        // ✅ 기타 에러
+        res.status(500).json({
+            success: false,
+            errorType: 'UNKNOWN',
+            message: error.message || '베팅 처리 중 오류가 발생했습니다.'
+        });
     }
 });
 
