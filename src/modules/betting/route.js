@@ -14,7 +14,7 @@ import { verifyToken, verifyAdmin } from '../../middleware/AuthMiddleware.js';
 const router = express.Router();
 
 // ============================================
-// 📋 공개 API (인증 불필요)
+// 공개 API (인증 불필요)
 // ============================================
 
 // 메인 페이지 - 진행 중인 베팅 목록
@@ -24,7 +24,7 @@ router.get('/GetMainData', GetMainData);
 router.get('/GetDetailData/:marketId', GetDetailData); 
 
 // ============================================
-// 👑 관리자 전용 API (Admin 권한 필요) - 구체적 경로 먼저!
+// 관리자 전용 API (Admin 권한 필요) - 구체적 경로 먼저!
 // ============================================
 
 // 새로운 베팅 생성
@@ -37,7 +37,7 @@ router.get('/finalizeable', verifyToken, verifyAdmin, getFinalizableBets);
 router.post('/finalize', verifyToken, verifyAdmin, finalizeBatchBets);
 
 // ============================================
-// 🔐 사용자 API (로그인 필요) - 동적 경로는 마지막!
+// 사용자 API (로그인 필요) - 동적 경로는 마지막!
 // ============================================
 
 // 베팅 참여

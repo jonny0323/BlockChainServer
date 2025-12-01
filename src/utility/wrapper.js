@@ -1,3 +1,4 @@
+//wrapper함수
 const wrapController = (fn) => {
   return async (req, res, next) => {
     try {

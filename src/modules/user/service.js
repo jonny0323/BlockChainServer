@@ -16,7 +16,7 @@ function genAccessToken(userIdx,userId, isAdmin = false) {
         { 
             idx : userIdx,
             id: userId,
-            admin: isAdmin  // ✅ admin 정보 추가
+            admin: isAdmin  
         },
         process.env.JWT_SECRET,
         { expiresIn: '3h' }
@@ -28,8 +28,6 @@ function genAccessToken(userIdx,userId, isAdmin = false) {
 //=====================================================================================================
 
 export const GoogleLogin = wrap((req, res) => {
-    console.log("Google 로그인 리다이렉트");
-    
     const url = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${process.env.GOOGLE_REDIRECT_URL}&response_type=code&scope=openid email`;
     res.redirect(url);
 });
@@ -39,8 +37,6 @@ export const GoogleLogin = wrap((req, res) => {
 //=====================================================================================================
 
 export const CreateToken = wrap(async (req, res) => {
-    console.log("=== CreateToken 시작 ===");
-    
     const { code } = req.query;
 
     // 1. Google OAuth Access Token 발급
@@ -73,26 +69,20 @@ export const CreateToken = wrap(async (req, res) => {
 
     // 3. DB에서 기존 유저 확인
     const existingUser = await userRepository.findUserByGoogleId(googleId);
-    console.log("통과");
 
-    // ✅ 기존 유저 로그인
+    // 기존 유저 로그인
     if (existingUser) {
         const accessToken = genAccessToken(
             existingUser.idx,
             existingUser.google_id, 
-            existingUser.is_admin  // ✅ DB의 admin 정보 전달
+            existingUser.is_admin  
         );
-        
-        console.log("✅ 기존 유저 로그인:", {
-            googleId: existingUser.google_id,
-            isAdmin: existingUser.is_admin
-        });
         
         res.redirect(`https://block-chain-front.vercel.app/callback?token=${accessToken}`);
         return;
     }
 
-    // ✅ 신규 유저 - PKP 생성
+    // 신규 유저 - PKP 생성
     const pkpData = await mintAndRegisterPKP(googleId);
 
     // 4. DB에 사용자 정보 저장
@@ -112,14 +102,8 @@ export const CreateToken = wrap(async (req, res) => {
     const accessToken = genAccessToken(
         UserIdx.idx,
         newUser.googleId,
-        false  // ✅ 신규 유저는 일반 유저
+        false  
     );
-    
-    console.log("✅ 신규 유저 가입:", {
-        googleId: newUser.googleId,
-        isAdmin: false
-    });
-    
     res.redirect(`https://block-chain-front.vercel.app/callback?token=${accessToken}`);
 });
 
@@ -162,7 +146,7 @@ export const GetWallet = wrap(async (req, res) => {
     
     if (!user) throw new Error('사용자를 찾을 수 없습니다.');
 
-    // ✅ Polygon에서 실제 잔액 조회
+    // Polygon에서 실제 잔액 조회
     const provider = new ethers.providers.JsonRpcProvider(
         process.env.POLYGON_RPC_URL,
         { name: "matic", chainId: 137 }
@@ -190,7 +174,7 @@ export const Logout = wrap(async (req, res) => {
 });
 
 //=====================================================================================================
-// ✅ 출금 (PKP 지갑 → 외부 지갑)
+// 출금 (PKP 지갑 → 외부 지갑)
 //=====================================================================================================
 
 export const Withdraw = wrap(async (req, res) => {
@@ -213,7 +197,7 @@ export const Withdraw = wrap(async (req, res) => {
         throw new Error('유효한 출금 금액이 필요합니다.');
     }
 
-    // ✅ PKP로 출금 트랜잭션 서명 & 전송
+    // PKP로 출금 트랜잭션 서명 & 전송
     const result = await signAndSendTransactionWithIdx(
         userId,
         targetAddress,

@@ -1,6 +1,4 @@
 // src/config/litPkpService.js
-// ✅ Lit Protocol v7.3.1 공식 문서 기반
-
 import { LitNodeClient } from '@lit-protocol/lit-node-client';
 import { EthWalletProvider } from '@lit-protocol/lit-auth-client';
 import { LitActionResource } from '@lit-protocol/auth-helpers';
@@ -33,8 +31,6 @@ const getLitNodeClient = async () => {
     });
 
     await litNodeClient.connect();
-    console.log('[Lit Service] Lit Node Client 연결 완료');
-    
     return litNodeClient;
 };
 
@@ -50,15 +46,11 @@ export const mintAndRegisterPKP = async (googleId) => {
         throw new Error("ADMIN_PRIVATE_KEY 환경 변수가 설정되지 않았습니다.");
     }
 
-    console.log(`[Lit Service] PKP Minting 시작`);
-
     try {
         const provider = new ethers.providers.JsonRpcProvider(rpcUrl);
         const wallet = new ethers.Wallet(privateKey, provider);
         
         const balance = await provider.getBalance(wallet.address);
-        console.log(`[Lit Service] 잔액: ${ethers.utils.formatEther(balance)} LIT`);
-        
         if (balance.isZero()) {
             throw new Error("잔액이 0입니다. Faucet: https://chronicle-yellowstone-faucet.getlit.dev/");
         }
@@ -74,8 +66,6 @@ export const mintAndRegisterPKP = async (googleId) => {
         const pkpTokenId = mintResult.pkp.tokenId;
         const pkpPublicKey = mintResult.pkp.publicKey;
         const pkpEthAddress = mintResult.pkp.ethAddress;
-
-        console.log(`[Lit Service] PKP 생성 완료: ${pkpEthAddress}`);
 
         const messageToSign = `Registering PKP for Google ID: ${googleId}`;
         const signedMessage = await wallet.signMessage(messageToSign);
@@ -100,8 +90,6 @@ export const mintAndRegisterPKP = async (googleId) => {
             authMethodId: authMethodId,
             authMethodScopes: [AuthMethodScope.SignAnything],
         });
-
-        console.log(`[Lit Service] Auth Method 등록 완료`);
 
         return { pkpPublicKey, pkpTokenId, pkpEthAddress };
 
@@ -131,7 +119,7 @@ const getPKPInfoByUserId = async (userId) => {
 };
 
 //=====================================================================================================
-// ✅ PKP Session Sigs 생성 (공식 방식)
+//  PKP Session Sigs 생성 (공식 방식)
 //=====================================================================================================
 
 const getPkpSessionSigs = async (litNodeClient, pkpPublicKey) => {
@@ -139,9 +127,7 @@ const getPkpSessionSigs = async (litNodeClient, pkpPublicKey) => {
     const provider = new ethers.providers.JsonRpcProvider(process.env.CHRONICLE_RPC_URL);
     const ethersSigner = new ethers.Wallet(privateKey, provider);
     
-    console.log('[Lit Service] PKP Session Sigs 생성 중...');
-    
-    // ✅ 공식 문서 방식: EthWalletProvider.authenticate 사용
+    //  공식 문서 방식: EthWalletProvider.authenticate 사용
     const pkpSessionSigs = await litNodeClient.getPkpSessionSigs({
         pkpPublicKey: pkpPublicKey,
         authMethods: [
@@ -160,22 +146,16 @@ const getPkpSessionSigs = async (litNodeClient, pkpPublicKey) => {
         expiration: new Date(Date.now() + 1000 * 60 * 10).toISOString(), // 10분
     });
     
-    console.log('[Lit Service] PKP Session Sigs 생성 완료');
-    
     return pkpSessionSigs;
 };
 
 //=====================================================================================================
-// ✅ 트랜잭션 서명 (executeJs 사용)
+// 트랜잭션 서명 (executeJs 사용)
 //=====================================================================================================
 
 export const signTransactionWithId = async (userId, toAddress, data, value = "0") => {
-    console.log(`[Lit Service] 트랜잭션 서명 시작`);
-    
     try {
         const pkpInfo = await getPKPInfoByUserId(userId);
-        console.log(`[Lit Service] PKP: ${pkpInfo.pkpEthAddress}`);
-        
         const litNodeClient = await getLitNodeClient();
         
         // ✅ Session Sigs 생성 (공식 방식)
@@ -203,14 +183,10 @@ export const signTransactionWithId = async (userId, toAddress, data, value = "0"
             type: 2,
         };
         
-        console.log(`[Lit Service] 트랜잭션 구성 완료`);
-        
         const serializedTx = ethers.utils.serializeTransaction(txParams);
         const unsignedTxHash = ethers.utils.keccak256(serializedTx);
         
-        console.log(`[Lit Service] executeJs로 서명 중...`);
-        
-        // ✅ executeJs로 서명
+        // executeJs로 서명
         const signatureResult = await litNodeClient.executeJs({
             sessionSigs: sessionSigs,
             code: `(async () => {
@@ -227,10 +203,7 @@ export const signTransactionWithId = async (userId, toAddress, data, value = "0"
             },
         });
         
-        console.log(`[Lit Service] 서명 완료`);
-        console.log('signatureResult:', signatureResult);
-        
-        // ✅ signatures.sig1에서 서명 정보 추출
+        // signatures.sig1에서 서명 정보 추출
         const signature = signatureResult.signatures.sig1;
         
         const signedTx = ethers.utils.serializeTransaction(txParams, {
@@ -238,8 +211,6 @@ export const signTransactionWithId = async (userId, toAddress, data, value = "0"
             s: "0x" + signature.s,
             v: signature.recid + 27,
         });
-        
-        console.log(`[Lit Service] 서명된 트랜잭션 생성 완료`);
         
         return signedTx;
         
@@ -254,8 +225,6 @@ export const signTransactionWithId = async (userId, toAddress, data, value = "0"
 //=====================================================================================================
 
 export const signAndSendTransactionWithIdx = async (userId, toAddress, data, value = "0") => {
-    console.log(`[Lit Service] 트랜잭션 서명 & 전송 시작`);
-    
     try {
         const signedTx = await signTransactionWithId(userId, toAddress, data, value);
         
@@ -265,14 +234,9 @@ export const signAndSendTransactionWithIdx = async (userId, toAddress, data, val
             chainId: 137
         });
         
-        console.log(`[Lit Service] 트랜잭션 전송 중...`);
         const txResponse = await provider.sendTransaction(signedTx);
         
-        console.log(`[Lit Service] TX Hash: ${txResponse.hash}`);
-        
         const receipt = await txResponse.wait();
-        
-        console.log(`[Lit Service] 트랜잭션 완료! Block: ${receipt.blockNumber}`);
         
         return {
             transactionHash: receipt.transactionHash,

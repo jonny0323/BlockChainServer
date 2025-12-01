@@ -3,7 +3,7 @@
 import db from "../../config/db.js";
 
 // ============================================
-// ✅ 정산 가능한 베팅 목록 조회
+// 정산 가능한 베팅 목록 조회
 // ============================================
 export const getFinalizableBets = async (currentTimestamp) => {
     const query = `
@@ -31,7 +31,7 @@ export const getFinalizableBets = async (currentTimestamp) => {
 };
 
 // ============================================
-// ✅ 마켓 정산 완료 업데이트
+// 마켓 정산 완료 업데이트
 // ============================================
 export const updateMarketFinalized = async (marketId, winnerDirection, finalPrice) => {
     const query = `
@@ -54,10 +54,8 @@ export const updateMarketFinalized = async (marketId, winnerDirection, finalPric
 };
 
 // ============================================
-// ✅ 기존 함수들 (참고용 - 이미 있다고 가정)
-// ============================================
-
 // 진행 중인 베팅 목록
+// ============================================
 export const getActiveBets = async (currentTimestamp) => {
     const query = `
         SELECT 
@@ -82,8 +80,9 @@ export const getActiveBets = async (currentTimestamp) => {
     return rows;
 };
 
-
+// ============================================
 // 마켓 상세 정보
+// ============================================
 export const getMarketDetail = async (marketId) => {
     const query = `
         SELECT *
@@ -95,7 +94,9 @@ export const getMarketDetail = async (marketId) => {
     return rows[0];
 };
 
+// ============================================
 // 참가자 수 업데이트
+// ============================================
 export const updateParticipantCount = async (marketId, isAbove) => {
     const column = isAbove ? 'yes_participant_count' : 'no_participant_count';
     
@@ -110,7 +111,9 @@ export const updateParticipantCount = async (marketId, isAbove) => {
     await db.execute(query, [marketId]);
 };
 
+// ============================================
 // 베팅 금액 업데이트
+// ============================================
 export const updateBetAmount = async (marketId, isAbove, amount) => {
     const column = isAbove ? 'yes_bet_amount' : 'no_bet_amount';
     
@@ -123,7 +126,9 @@ export const updateBetAmount = async (marketId, isAbove, amount) => {
     await db.execute(query, [amount, marketId]);
 };
 
+// ============================================
 // 베팅 기록 저장
+// ============================================
 export const saveBet = async ({ userIdx, betDirection, amount, betDetailIdx, transactionHash }) => {
     const query = `
         INSERT INTO bet
@@ -142,7 +147,9 @@ export const saveBet = async ({ userIdx, betDirection, amount, betDetailIdx, tra
     return result;
 };
 
+// ============================================
 // 사용자 베팅 내역
+// ============================================
 export const getUserBetHistory = async (marketId, userIdx) => {
     const query = `
         SELECT 
@@ -160,7 +167,9 @@ export const getUserBetHistory = async (marketId, userIdx) => {
     return rows;
 };
 
+// ============================================
 // 마켓 참여자 수
+// ============================================
 export const getMarketParticipants = async (marketId) => {
     const query = `
         SELECT 
@@ -174,7 +183,9 @@ export const getMarketParticipants = async (marketId) => {
     return rows[0];
 };
 
+// ============================================
 // 새 마켓 저장
+// ============================================
 export const saveNewMarket = async ({ title, settlementTime, targetPrice, assetType, marketContractAddress, priceFeedAddress }) => {
     const query = `
         INSERT INTO bet_detail 

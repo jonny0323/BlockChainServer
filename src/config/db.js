@@ -19,8 +19,6 @@ export const pool = mysql.createPool({
     multipleStatements: true  // 여러 쿼리 실행 허용
 }).promise();
 
-console.log("MySQL Connection Pool Created.");
-
 // 테이블 자동 초기화
 async function initializeTables() {
     try {
@@ -28,8 +26,6 @@ async function initializeTables() {
         const [tables] = await pool.query("SHOW TABLES LIKE 'users'");
         
         if (tables.length === 0) {
-            console.log("📋 Initializing database tables...");
-            
             // init.sql 읽기 (src/config에서 프로젝트 루트로 2단계 위)
             const initSQL = fs.readFileSync(
                 path.join(__dirname, '../../init.sql'), 
@@ -41,9 +37,7 @@ async function initializeTables() {
             
             // 테이블 생성
             await pool.query(cleanSQL);
-            console.log("✅ Database tables initialized successfully");
         } else {
-            console.log("✅ Database tables already exist");
         }
     } catch (error) {
         console.error("❌ Database initialization error:", error.message);
@@ -51,7 +45,6 @@ async function initializeTables() {
     }
 }
 
-// 서버 시작 시 자동 실행
 initializeTables();
 
 export default pool;
