@@ -58,7 +58,7 @@ export const updateMarketFinalized = async (marketId, winnerDirection, finalPric
 // ============================================
 
 // 진행 중인 베팅 목록
-export const getActiveBets = async () => {
+export const getActiveBets = async (currentTimestamp) => {
     const query = `
         SELECT 
             idx,
@@ -74,12 +74,14 @@ export const getActiveBets = async () => {
             is_finalized
         FROM bet_detail
         WHERE is_finalized = false
+        AND UNIX_TIMESTAMP(settlement_time) > ?
         ORDER BY settlement_time ASC
     `;
     
-    const [rows] = await db.execute(query);
+    const [rows] = await db.execute(query, [currentTimestamp]);
     return rows;
 };
+
 
 // 마켓 상세 정보
 export const getMarketDetail = async (marketId) => {

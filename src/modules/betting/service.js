@@ -554,9 +554,17 @@ export const placeBettingWithPKP = wrap(async (req, res) => {
 
 
 export const GetMainData = wrap(async (req, res) => {
-    // ✅ 진행 중인 베팅 목록 가져오기
-    const bets = await bettingRepository.getActiveBets();
-    console.log("ㅁㅇㄴㄹㅁㅇㄴㄹㅁㅇㄴㄹㅁㄴ아ㅣㄹ;ㅣ;ㅁㄴ아ㅓ리ㅏ;ㅓㄴㅇ;ㅏ")
+    // ✅ 현재 시간 확인
+    const provider = new ethers.providers.JsonRpcProvider(RPC_URL, {
+        name: "matic",
+        chainId: 137
+    });
+    
+    const currentBlock = await provider.getBlock("latest");
+    const currentTimestamp = currentBlock.timestamp;
+    
+    // ✅ 진행 중인 베팅 목록 가져오기 (현재 시간 전달)
+    const bets = await bettingRepository.getActiveBets(currentTimestamp);
 
     // ✅ 프론트엔드 형식으로 변환
     const formattedBets = bets.map(bet => {
