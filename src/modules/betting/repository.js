@@ -21,7 +21,7 @@ export const getFinalizableBets = async (currentTimestamp) => {
             no_bet_amount,
             is_finalized
         FROM bet_detail
-        WHERE settlement_time <= ?
+        WHERE UNIX_TIMESTAMP(settlement_time) <= ?
           AND is_finalized = false
         ORDER BY settlement_time ASC
     `;
